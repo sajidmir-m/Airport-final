@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Portal - Airport Operations</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        .staff-portal-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+        }
+        
+        .conveyor-monitor {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px solid #e9ecef;
+        }
+        
+        .conveyor-belt-visual {
+            background: linear-gradient(90deg, #2d3748 0%, #4a5568 50%, #2d3748 100%);
+            height: 120px;
+            border-radius: 16px;
+            margin: 15px 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            padding-top: 32px;
+        }
+        
+        .conveyor-belt-visual::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: repeating-linear-gradient(90deg, #e2e8f0 0px, #e2e8f0 25px, transparent 25px, transparent 50px);
+            animation: move 3s linear infinite;
+        }
+        
+        @keyframes move {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(50px); }
+        }
+        
+        .belt-stage-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .belt-stage-segment {
+            flex: 1;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            border-right: 1px solid rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(4px);
+        }
+
+        .belt-stage-segment:last-child {
+            border-right: none;
+        }
+
+        .belt-stage-segment .stage-label span {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: rgba(255,255,255,0.95);
+        }
+
+        .belt-stage-segment .stage-label small {
+            font-size: 10px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .belt-stage-checking { background: linear-gradient(135deg, rgba(16,185,129,0.45), rgba(5,150,105,0.1)); }
+        .belt-stage-sorting { background: linear-gradient(135deg, rgba(59,130,246,0.4), rgba(37,99,235,0.08)); }
+        .belt-stage-security { background: linear-gradient(135deg, rgba(249,115,22,0.4), rgba(217,119,6,0.08)); }
+        .belt-stage-boarding { background: linear-gradient(135deg, rgba(236,72,153,0.35), rgba(219,39,119,0.08)); }
+
+        .bag-visual {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background: #f56565;
+            border-radius: 50%;
+            top: 80px;
+            transition: left 0.8s ease;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+            z-index: 10;
+            cursor: pointer;
+        }
+        
+        .bag-visual.priority { background: #ed8936; border: 3px solid #fff; }
+        .bag-visual.fragile { background: #9f7aea; border: 3px solid #fff; }
+        .bag-visual.transfer { background: #38b2ac; border: 3px solid #fff; }
+        
+        .alert-panel {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 6px solid #fbbf24;
+        }
+        
+        .insight-panel {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .status-active { background: #10b981; color: white; }
+        .status-idle { background: #6b7280; color: white; }
+        .status-maintenance { background: #f59e0b; color: white; }
+        .status-slow { background: #ef4444; color: white; }
+        .status-overloaded { background: #dc2626; color: white; }
+        
+        .health-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        .health-excellent { background: #10b981; }
+        .health-good { background: #3b82f6; }
+        .health-fair { background: #f59e0b; }
+        .health-poor { background: #ef4444; }
+        .health-critical { background: #dc2626; }
+        
+        .sensor-data {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 10px 0;
+        }
+        
+        .sensor-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #fbbf24;
+        }
+        
+        .staff-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .staff-card.available { border-left-color: #10b981; }
+        .staff-card.busy { border-left-color: #f59e0b; }
+        .staff-card.offline { border-left-color: #6b7280; }
+        
+        .conveyor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin: 25px 0;
+        }
+        
+        .conveyor-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            border: 2px solid #e9ecef;
+        }
+
+        .belt-stage-flow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 12px 0 18px;
+        }
+
+        .flow-stage {
+            flex: 1;
+            min-width: 200px;
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 12px 16px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .flow-stage.active {
+            border-color: #f6ad55;
+            box-shadow: 0 6px 20px rgba(246,173,85,0.35);
+            transform: translateY(-2px);
+        }
+
+        .flow-stage-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .flow-stage-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59,130,246,0.15);
+            color: #1d4ed8;
+        }
+
+        .flow-stage-header strong {
+            font-size: 14px;
+            display: block;
+        }
+
+        .flow-stage-header small {
+            font-size: 12px;
+            color: #4a5568;
+        }
+
+        .flow-stage-progress {
+            position: relative;
+            height: 6px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .flow-stage-progress-fill {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+
+        .flow-stage-checking .flow-stage-progress-fill {
+            background: linear-gradient(90deg, #0f766e, #2dd4bf);
+        }
+
+        .flow-stage-sorting .flow-stage-progress-fill {
+            background: linear-gradient(90deg, #1e40af, #60a5fa);
+        }
+
+        .flow-stage-security .flow-stage-progress-fill {
+            background: linear-gradient(90deg, #b45309, #f59e0b);
+        }
+
+        .flow-stage-boarding .flow-stage-progress-fill {
+            background: linear-gradient(90deg, #be185d, #f472b6);
+        }
+
+        .flow-stage-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #2d3748;
+        }
+
+        .flow-connector {
+            width: 32px;
+            height: 2px;
+            background: #cbd5f5;
+            position: relative;
+        }
+
+        .flow-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ed8936;
+            position: absolute;
+            top: 50%;
+            right: -5px;
+            transform: translateY(-50%);
+            box-shadow: 0 0 12px rgba(237,137,54,0.6);
+        }
+        
+        .efficiency-gauge {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 0 auto;
+            color: white;
+        }
+        
+        .efficiency-90 { background: conic-gradient(#10b981 0deg, #10b981 324deg, #e5e7eb 324deg); }
+        .efficiency-75 { background: conic-gradient(#3b82f6 0deg, #3b82f6 270deg, #e5e7eb 270deg); }
+        .efficiency-60 { background: conic-gradient(#f59e0b 0deg, #f59e0b 216deg, #e5e7eb 216deg); }
+        .efficiency-40 { background: conic-gradient(#ef4444 0deg, #ef4444 144deg, #e5e7eb 144deg); }
+        .efficiency-0 { background: conic-gradient(#dc2626 0deg, #dc2626 0deg, #e5e7eb 0deg); }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn-action {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <!-- Staff Portal Header -->
+    <div class="staff-portal-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-user-tie me-3"></i>Staff Operations Portal</h1>
+                    <p class="mb-0">AI-Powered Airport Operations Management & Conveyor Belt Monitoring</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex justify-content-end gap-3">
+                        <button class="btn btn-outline-light" onclick="refreshAllData()">
+                            <i class="fas fa-sync-alt me-2"></i>Refresh
+                        </button>
+                        <button class="btn btn-outline-light" onclick="toggleTheme()">
+                            <i class="fas fa-moon" id="theme-icon"></i>
+                        </button>
+                        <a href="/" class="btn btn-outline-light">
+                            <i class="fas fa-arrow-left me-2"></i>Back
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Staff Notifications Section -->
+        <div id="notifications-section" class="mb-4">
+            <div class="collapsible-section">
+                <div class="section-header" onclick="toggleSectionContent('notifications-section')" style="cursor: pointer;">
+                    <h3><i class="fas fa-bullhorn me-2"></i>Staff Notifications</h3>
+                    <div class="section-controls">
+                        <button class="btn btn-sm btn-outline-primary" onclick="refreshAllData()" onclick="event.stopPropagation()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="toggleSectionContent('notifications-section')" onclick="event.stopPropagation()">
+                            <i class="fas fa-chevron-down" id="notifications-section-chevron"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="section-content expanded" id="notifications-section-content">
+                    <div class="row g-4" id="notifications-container">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0"><i class="fas fa-inbox me-2"></i>Inbox</h5>
+                                </div>
+                                <div class="card-body" id="notifications-list">
+                                    <div class="text-center text-muted py-3">
+                                        <i class="fas fa-spinner fa-spin mb-2"></i>
+                                        <p class="mb-0">Loading notifications...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="sent-notifications-column" style="display: none;">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Sent Notifications</h5>
+                                </div>
+                                <div class="card-body" id="sent-notifications-list">
+                                    <div class="text-center text-muted py-3">
+                                        <i class="fas fa-spinner fa-spin mb-2"></i>
+                                        <p class="mb-0">Loading...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Alerts Section -->
+        <div id="ai-alerts-section" class="mb-4">
+            <div class="collapsible-section">
+                <div class="section-header" onclick="toggleSectionContent('ai-alerts-section')" style="cursor: pointer;">
+                    <h3><i class="fas fa-exclamation-triangle me-2 text-warning"></i>AI-Powered Alerts & Notifications</h3>
+                    <div class="section-controls">
+                        <button class="btn btn-sm btn-outline-warning" onclick="refreshAllData()" onclick="event.stopPropagation()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="toggleSectionContent('ai-alerts-section')" onclick="event.stopPropagation()">
+                            <i class="fas fa-chevron-down" id="ai-alerts-section-chevron"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="section-content collapsed" id="ai-alerts-section-content">
+                    <div id="ai-alerts-content">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-bell fa-2x mb-2"></i>
+                            <p>Loading AI alerts...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Tabs -->
+        <ul class="nav nav-tabs mb-4" id="staffTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="conveyor-tab" data-bs-toggle="tab" data-bs-target="#conveyor" type="button" role="tab">
+                    <i class="fas fa-cogs me-2"></i>Conveyor Belt Monitoring
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="staff-tab" data-bs-toggle="tab" data-bs-target="#staff" type="button" role="tab">
+                    <i class="fas fa-users me-2"></i>Staff Management
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="complaints-tab" data-bs-toggle="tab" data-bs-target="#complaints" type="button" role="tab">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Complaints & Issues
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="ai-insights-tab" data-bs-toggle="tab" data-bs-target="#ai-insights" type="button" role="tab">
+                    <i class="fas fa-brain me-2"></i>AI Insights
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="staffTabsContent">
+            <!-- Conveyor Belt Monitoring Tab -->
+            <div class="tab-pane fade show active" id="conveyor" role="tabpanel">
+                            <div class="row">
+                    <div class="col-12">
+                        <div class="collapsible-section">
+                            <div class="section-header" onclick="toggleSectionContent('conveyor-section')" style="cursor: pointer;">
+                                <h3><i class="fas fa-eye me-2"></i>Live Conveyor Belt System</h3>
+                                <div class="section-controls">
+                                    <button class="btn btn-sm btn-outline-info" onclick="toggleSectionContent('conveyor-section')" onclick="event.stopPropagation()">
+                                        <i class="fas fa-chevron-down" id="conveyor-section-chevron"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="section-content expanded" id="conveyor-section-content">
+                                <p class="text-muted">Real-time monitoring of all conveyor belts with AI-powered alerts and predictive maintenance</p>
+                                
+                                <!-- System Overview -->
+                                <div class="row mb-4">
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h4 id="total-belts">-</h4>
+                                                <p class="card-text">Total Belts</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h4 id="active-belts">-</h4>
+                                                <p class="card-text">Active Belts</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h4 id="total-bags">-</h4>
+                                                <p class="card-text">Live Bags</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="card text-center">
+                                            <div class="card-body">
+                                                <h4 id="avg-efficiency">-%</h4>
+                                                <p class="card-text">Avg Efficiency</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                                <!-- Conveyor Belts Grid -->
+                                <div id="conveyor-belts-grid" class="conveyor-grid">
+                                    <!-- Conveyor belts will be populated here -->
+                        </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Staff Management Tab -->
+            <div class="tab-pane fade" id="staff" role="tabpanel">
+                <div class="row">
+                <div class="col-12">
+                        <div class="collapsible-section">
+                            <div class="section-header" onclick="toggleSectionContent('staff-section')" style="cursor: pointer;">
+                                <h3><i class="fas fa-users me-2"></i>Staff Management & Availability</h3>
+                                <div class="section-controls">
+                                    <button class="btn btn-sm btn-outline-info" onclick="toggleSectionContent('staff-section')" onclick="event.stopPropagation()">
+                                        <i class="fas fa-chevron-down" id="staff-section-chevron"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="section-content expanded" id="staff-section-content">
+                                <p class="text-muted">Monitor staff availability, assign tasks, and manage resources</p>
+                                
+                                <div id="staff-management-container">
+                                    <!-- Staff management content will be populated here -->
+                        </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complaints & Issues Tab -->
+            <div class="tab-pane fade" id="complaints" role="tabpanel">
+                <div class="row">
+                <div class="col-12">
+                        <div class="collapsible-section">
+                            <div class="section-header" onclick="toggleSectionContent('complaints-section')" style="cursor: pointer;">
+                                <h3><i class="fas fa-exclamation-triangle me-2"></i>Complaints & Issue Tracking</h3>
+                                <div class="section-controls">
+                                    <button class="btn btn-sm btn-outline-info" onclick="toggleSectionContent('complaints-section')" onclick="event.stopPropagation()">
+                                        <i class="fas fa-chevron-down" id="complaints-section-chevron"></i>
+                                    </button>
+                                </div>
+                                        </div>
+                            <div class="section-content expanded" id="complaints-section-content">
+                                <p class="text-muted">Track passenger complaints and system issues for resolution</p>
+                                
+                                <div id="complaints-container">
+                                    <!-- Complaints content will be populated here -->
+                                </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                        </div>
+                                    </div>
+
+            <!-- AI Insights Tab -->
+            <div class="tab-pane fade" id="ai-insights" role="tabpanel">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="collapsible-section">
+                            <div class="section-header" onclick="toggleSectionContent('ai-insights-section')" style="cursor: pointer;">
+                                <h3><i class="fas fa-brain me-2"></i>AI-Powered Insights & Predictions</h3>
+                                <div class="section-controls">
+                                    <button class="btn btn-sm btn-outline-info" onclick="toggleSectionContent('ai-insights-section')" onclick="event.stopPropagation()">
+                                        <i class="fas fa-chevron-down" id="ai-insights-section-chevron"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="section-content collapsed" id="ai-insights-section-content">
+                                <p class="text-muted">Intelligent analysis and recommendations for operational improvements</p>
+                                
+                                <div id="ai-insights-container">
+                                    <!-- AI insights content will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin fa-3x"></i>
+            <p>Loading staff portal data...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        window.staffPortalConfig = {
+            role: '{{ current_user.role }}',
+            airportCode: '{{ current_user.airport_code or "" }}'
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/staff_portal.js') }}"></script>
+    <script>
+        // Initialize staff portal
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeStaffPortal();
+        });
+    </script>
+</body>
+</html>

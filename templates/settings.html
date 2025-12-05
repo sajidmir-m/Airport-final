@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - AI Smart Airport Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+            <div class="container">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-plane me-2"></i>
+                    AI Smart Airport Dashboard
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <button class="btn btn-outline-light me-2" onclick="toggleTheme()">
+                        <i class="fas fa-moon" id="theme-icon"></i>
+                    </button>
+                    <a class="btn btn-outline-light" href="/">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Page Title -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h1 class="display-5">
+                        <i class="fas fa-cog me-3"></i>
+                        Settings & Configuration
+                    </h1>
+                    <p class="lead text-muted">Manage dashboard preferences and system configuration</p>
+                </div>
+            </div>
+
+            <!-- Settings Tabs -->
+            <div class="row">
+                <div class="col-12">
+                    <ul class="nav nav-tabs" id="settingsTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">
+                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="data-sources-tab" data-bs-toggle="tab" data-bs-target="#data-sources" type="button" role="tab">
+                                <i class="fas fa-database me-2"></i>Data Sources
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system" type="button" role="tab">
+                                <i class="fas fa-server me-2"></i>System
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content mt-4" id="settingsTabContent">
+                <!-- Dashboard Settings -->
+                <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-line me-2"></i>Dashboard Preferences</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="dashboard-settings-form">
+                                        <div class="mb-3">
+                                            <label for="refresh-interval" class="form-label">Auto-refresh Interval</label>
+                                            <select class="form-select" id="refresh-interval">
+                                                <option value="30">30 seconds</option>
+                                                <option value="60">1 minute</option>
+                                                <option value="300">5 minutes</option>
+                                                <option value="0">Manual only</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="default-theme" class="form-label">Default Theme</label>
+                                            <select class="form-select" id="default-theme">
+                                                <option value="light">Light</option>
+                                                <option value="dark">Dark</option>
+                                                <option value="auto">Auto (System)</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="enable-animations" checked>
+                                                <label class="form-check-label" for="enable-animations">
+                                                    Enable animations and transitions
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="enable-notifications" checked>
+                                                <label class="form-check-label" for="enable-notifications">
+                                                    Enable browser notifications for alerts
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-2"></i>Save Settings
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-info-circle me-2"></i>Airport Overview</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="airport-stats">
+                                        {% for code, airport in airports.items() %}
+                                        <div class="stat-item mb-2">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span>{{ airport.code }}</span>
+                                                <span class="badge bg-success">Online</span>
+                                            </div>
+                                            <small class="text-muted">{{ airport.city }}</small>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Sources Settings -->
+                <div class="tab-pane fade" id="data-sources" role="tabpanel">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-plug me-2"></i>Data Source Connections</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Data Source</th>
+                                                    <th>Status</th>
+                                                    <th>Last Updated</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>
+                                                        <i class="fas fa-users me-2"></i>
+                                                        Passenger Flow System
+                                                    </td>
+                                                    <td><span class="badge bg-success">Connected</span></td>
+                                                    <td>Just now</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary">Test</button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <i class="fas fa-clock me-2"></i>
+                                                        Queue Management
+                                                    </td>
+                                                    <td><span class="badge bg-success">Connected</span></td>
+                                                    <td>Just now</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary">Test</button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <i class="fas fa-suitcase me-2"></i>
+                                                        Baggage Tracking
+                                                    </td>
+                                                    <td><span class="badge bg-success">Connected</span></td>
+                                                    <td>Just now</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary">Test</button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <i class="fas fa-plane me-2"></i>
+                                                        Flight Information
+                                                    </td>
+                                                    <td><span class="badge bg-success">Connected</span></td>
+                                                    <td>Just now</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary">Test</button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <i class="fas fa-shield-alt me-2"></i>
+                                                        Security Systems
+                                                    </td>
+                                                    <td><span class="badge bg-success">Connected</span></td>
+                                                    <td>Just now</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary">Test</button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Settings -->
+                <div class="tab-pane fade" id="system" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-info me-2"></i>System Information</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="system-info">
+                                        <div class="info-item mb-3">
+                                            <strong>Version:</strong> 1.0.0
+                                        </div>
+                                        <div class="info-item mb-3">
+                                            <strong>Uptime:</strong> 2 hours 34 minutes
+                                        </div>
+                                        <div class="info-item mb-3">
+                                            <strong>Active Connections:</strong> 6 airports
+                                        </div>
+                                        <div class="info-item mb-3">
+                                            <strong>Last Backup:</strong> 2 hours ago
+                                        </div>
+                                        <div class="info-item mb-3">
+                                            <strong>Memory Usage:</strong> 
+                                            <div class="progress mt-1">
+                                                <div class="progress-bar" style="width: 65%">65%</div>
+                                            </div>
+                                        </div>
+                                        <div class="info-item mb-3">
+                                            <strong>CPU Usage:</strong>
+                                            <div class="progress mt-1">
+                                                <div class="progress-bar bg-success" style="width: 23%">23%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-tools me-2"></i>System Actions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-primary" onclick="performSystemAction('refresh')">
+                                            <i class="fas fa-sync-alt me-2"></i>
+                                            Refresh All Data Sources
+                                        </button>
+                                        
+                                        <button class="btn btn-outline-info" onclick="performSystemAction('backup')">
+                                            <i class="fas fa-save me-2"></i>
+                                            Create System Backup
+                                        </button>
+                                        
+                                        <button class="btn btn-outline-warning" onclick="performSystemAction('clear-cache')">
+                                            <i class="fas fa-trash me-2"></i>
+                                            Clear Cache
+                                        </button>
+                                        
+                                        <hr>
+                                        
+                                        <button class="btn btn-outline-secondary" onclick="downloadLogs()">
+                                            <i class="fas fa-download me-2"></i>
+                                            Download System Logs
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+    <script>
+        function toggleTheme() {
+            const body = document.body;
+            const icon = document.getElementById('theme-icon');
+            
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                icon.className = 'fas fa-moon';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                icon.className = 'fas fa-sun';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // Load saved theme
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme');
+            const icon = document.getElementById('theme-icon');
+            
+            if (savedTheme === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                icon.className = 'fas fa-sun';
+            }
+        });
+    </script>
+</body>
+</html>

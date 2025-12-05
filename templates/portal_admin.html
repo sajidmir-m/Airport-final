@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal | AI Smart Airport Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-plane"></i> Airport Admin Portal
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-white">
+                    {{ current_user.full_name }} · {{ current_user.role|capitalize }}
+                </span>
+                <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>Admin Control Center</h2>
+                <p class="text-muted">Manage all airports, users, and resources</p>
+            </div>
+            <a class="btn btn-primary" href="{{ url_for('manage_users') }}">
+                <i class="fas fa-users-cog me-2"></i>Manage Users
+            </a>
+        </div>
+
+        <!-- Staff Allocation Overview -->
+        <div class="card mb-5">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-users me-2"></i>Staff Allocation by Airport</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Airport</th>
+                                <th>Managers</th>
+                                <th>Total Staff</th>
+                                <th>Work Assignments</th>
+                                <th>Resources</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staffAllocationTable">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Airport Grid (like home page) -->
+        <div class="mb-5">
+            <h3 class="mb-4">Select Airport Dashboard</h3>
+            <div class="row g-4">
+                {% for code, airport in airports.items() %}
+                <div class="col-lg-4 col-md-6">
+                    <div class="card airport-card h-100" onclick="window.location.href='{{ url_for('dashboard', airport_code=code) }}'" style="cursor: pointer;">
+                        <div class="card-body text-center">
+                            <div class="airport-icon mb-3">
+                                <i class="fas fa-plane-departure fa-3x text-primary"></i>
+                            </div>
+                            <h5 class="card-title">{{ airport.code }}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">{{ airport.city }}</h6>
+                            <p class="card-text">{{ airport.name }}</p>
+                            <div class="airport-status">
+                                <span class="badge bg-success me-2">
+                                    <i class="fas fa-circle"></i> Online
+                                </span>
+                                <span class="badge bg-info">
+                                    <i class="fas fa-chart-line"></i> Monitoring Active
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <a href="{{ url_for('dashboard', airport_code=code) }}" class="btn btn-primary w-100">
+                                <i class="fas fa-chart-line me-1"></i>View Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Load staff allocation data
+        fetch('/api/admin/staff-allocation')
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.getElementById('staffAllocationTable');
+                if (data.error) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${data.error}</td></tr>`;
+                    return;
+                }
+                
+                if (data.airports && data.airports.length > 0) {
+                    tbody.innerHTML = data.airports.map(airport => `
+                        <tr>
+                            <td><strong>${airport.code}</strong><br><small class="text-muted">${airport.name}</small></td>
+                            <td><span class="badge bg-primary">${airport.managers || 0}</span></td>
+                            <td><span class="badge bg-info">${airport.total_staff || 0}</span></td>
+                            <td>
+                                ${airport.work_assignments && airport.work_assignments.length > 0 
+                                    ? airport.work_assignments.map(w => `<span class="badge bg-secondary me-1">${w}</span>`).join('')
+                                    : '<span class="text-muted">-</span>'}
+                            </td>
+                            <td>
+                                <small class="text-muted">
+                                    Belts: ${airport.resources?.belts || 0}<br>
+                                    Gates: ${airport.resources?.gates || 0}
+                                </small>
+                            </td>
+                            <td>
+                                <a href="/dashboard/${airport.code}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No staff allocations found</td></tr>';
+                }
+            })
+            .catch(e => {
+                console.error('Error loading staff allocation:', e);
+                document.getElementById('staffAllocationTable').innerHTML = 
+                    '<tr><td colspan="6" class="text-center text-danger">Error loading data</td></tr>';
+            });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gate Management | {{ airport.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <style>
+        .gate-card {
+            border-left: 5px solid #0d6efd;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: transform 0.2s ease;
+        }
+        .gate-card:hover { transform: translateY(-3px); }
+        .status-pill {
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .timeline-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #0d6efd; display: inline-block; margin-right: 6px;
+        }
+        .badge-flight {
+            font-size: 0.85rem;
+            background: #0d6efd;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('portal', role='staff') }}">
+                <i class="fas fa-plane-departure me-2"></i>Gate Management
+            </a>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('dashboard', airport_code=airport_code) }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-chart-line me-1"></i>Dashboard
+                </a>
+                <a href="{{ url_for('staff_portal') }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>Back
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <div class="alert alert-primary">
+            <h4 class="alert-heading mb-1">
+                <i class="fas fa-map-marker-alt me-2"></i>{{ airport.name }} ({{ airport.code }})
+            </h4>
+            <p class="mb-0">Live view of gate assignments, boarding windows, and aircraft movements.</p>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h2 id="totalGates">-</h2>
+                        <p class="text-muted mb-0">Total Gates Monitored</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h2 id="activeBoarding">-</h2>
+                        <p class="text-muted mb-0">Boarding Now</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h2 id="arrivalsInProgress">-</h2>
+                        <p class="text-muted mb-0">Arrivals Inbound</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3" id="gateCards">
+            <div class="col-12 text-center text-muted py-4">
+                <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                <p>Loading gate assignments...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const airportCode = '{{ airport_code }}';
+
+        function statusBadge(status) {
+            const mapping = {
+                'Boarding': 'success',
+                'On Time': 'primary',
+                'Delayed': 'warning',
+                'Arrived': 'info',
+                'In Air': 'info',
+                'Cancelled': 'danger',
+                'Departed': 'secondary'
+            };
+            const color = mapping[status] || 'secondary';
+            return `<span class="status-pill bg-${color} text-white">${status}</span>`;
+        }
+
+        function renderGateCards(data) {
+            const container = document.getElementById('gateCards');
+            if (!data.gates || !data.gates.length) {
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            <i class="fas fa-info-circle me-2"></i>No gate assignments available.
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            document.getElementById('totalGates').textContent = data.gates.length;
+            document.getElementById('activeBoarding').textContent = data.gates.filter(g => g.status === 'Boarding').length;
+            document.getElementById('arrivalsInProgress').textContent = data.gates.filter(g => ['Arrived', 'In Air'].includes(g.status)).length;
+
+            container.innerHTML = data.gates.map(gate => `
+                <div class="col-md-6">
+                    <div class="card gate-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <h5 class="mb-0">Gate ${gate.gate}</h5>
+                                    <small class="text-muted">Terminal ${gate.terminal}</small>
+                                </div>
+                                ${statusBadge(gate.status)}
+                            </div>
+
+                            <div class="mb-2">
+                                <span class="badge badge-flight text-white">${gate.flight_number}</span>
+                                <strong class="ms-2">${gate.airline}</strong>
+                                <div class="text-muted small">${gate.destination}</div>
+                            </div>
+
+                            <div class="row mb-2">
+                                <div class="col-6">
+                                    <small class="text-muted">Scheduled</small>
+                                    <div class="fw-semibold">${gate.scheduled_time}</div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Actual</small>
+                                    <div class="fw-semibold">${gate.actual_time}</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-2">
+                                <div><span class="timeline-dot"></span><strong>Boarding:</strong> ${gate.boarding_start}</div>
+                                <div><span class="timeline-dot"></span><strong>Arrival Gate:</strong> ${gate.arrival_gate}</div>
+                                <div><span class="timeline-dot"></span><strong>Next:</strong> ${gate.next_gate}</div>
+                            </div>
+
+                            ${gate.notes ? `<div class="alert alert-warning py-2 small mb-0"><strong>Note:</strong> ${gate.notes}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadGateData() {
+            fetch(`/api/airport/${airportCode}/gate-operations`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('gateCards').innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-danger text-center">${data.error}</div>
+                            </div>`;
+                        return;
+                    }
+                    renderGateCards(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('gateCards').innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-danger text-center">Failed to load gate data.</div>
+                        </div>`;
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGateData();
+            setInterval(loadGateData, 60000);
+        });
+    </script>
+</body>
+</html>
+

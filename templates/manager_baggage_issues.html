@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baggage Issues | Manager Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-warning">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('portal', role=current_user.role) }}">
+                <i class="fas fa-exclamation-triangle"></i> Baggage Issues
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-white">
+                    {{ current_user.full_name }} · {{ airport.code }}
+                </span>
+                <a class="btn btn-outline-light btn-sm" href="{{ url_for('portal', role=current_user.role) }}">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Portal
+                </a>
+                <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="alert alert-warning mb-4">
+            <h4 class="alert-heading">
+                <i class="fas fa-map-marker-alt me-2"></i>{{ airport.name }} ({{ airport.code }})
+            </h4>
+            <p class="mb-0">Monitor and manage baggage issues at your airport.</p>
+        </div>
+
+        <!-- Alerts Section -->
+        {% if alerts %}
+        <div class="card border-danger mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Active Alerts ({{ alerts|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% for alert in alerts %}
+                <div class="alert alert-danger mb-2">
+                    <strong>{{ alert.get('type', 'Alert') }}:</strong> {{ alert.get('message', 'No message') }}
+                    <br><small class="text-muted">{{ alert.get('timestamp', '') }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Issues Table -->
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Conveyor Belt Issues ({{ issues|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if issues %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Belt ID</th>
+                                <th>Terminal</th>
+                                <th>Status</th>
+                                <th>Health</th>
+                                <th>Delay Risk</th>
+                                <th>Efficiency</th>
+                                <th>Issues</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for issue in issues %}
+                            <tr>
+                                <td><strong>{{ issue.belt_id }}</strong></td>
+                                <td>{{ issue.terminal }}</td>
+                                <td>
+                                    <span class="badge bg-{% if issue.status == 'Active' %}success{% else %}warning{% endif %}">
+                                        {{ issue.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if issue.health_status == 'Good' %}success{% elif issue.health_status == 'Fair' %}warning{% else %}danger{% endif %}">
+                                        {{ issue.health_status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if issue.delay_risk == 'Low' %}success{% elif issue.delay_risk == 'Medium' %}warning{% else %}danger{% endif %}">
+                                        {{ issue.delay_risk }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar {% if issue.efficiency_score >= 80 %}bg-success{% elif issue.efficiency_score >= 60 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                             role="progressbar" 
+                                             style="width: {{ issue.efficiency_score }}%">
+                                            {{ issue.efficiency_score }}%
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if issue.predicted_issues %}
+                                        <ul class="list-unstyled mb-0">
+                                            {% for pred_issue in issue.predicted_issues[:3] %}
+                                            <li><small class="text-danger">{{ pred_issue }}</small></li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('dashboard', airport_code=airport_code) }}#{{ issue.belt_id }}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>No active baggage issues found. All systems operational!
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Notify Staff Section -->
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-bullhorn me-2"></i>Notify Staff</h5>
+            </div>
+            <div class="card-body">
+                <form id="notifyForm">
+                    <div class="mb-3">
+                        <label class="form-label">Select Staff</label>
+                        <select class="form-select" id="staffSelect" required>
+                            <option value="">Select staff member...</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message</label>
+                        <textarea class="form-control" id="messageText" rows="3" required 
+                                  placeholder="Enter notification message..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Attachment / Reference URL (optional)</label>
+                        <input type="url" class="form-control" id="attachmentUrl" placeholder="https://example.com/report.pdf">
+                        <small class="text-muted">Share a document link, checklist, or task reference for the staff member.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" id="prioritySelect">
+                            <option value="normal">Normal</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-info">
+                        <i class="fas fa-paper-plane me-2"></i>Send Notification
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Load staff list
+        fetch('/api/airport/{{ airport_code }}/staff-list')
+            .then(r => r.json())
+            .then(data => {
+                const select = document.getElementById('staffSelect');
+                if (data.staff && data.staff.length > 0) {
+                    data.staff.forEach(staff => {
+                        const option = document.createElement('option');
+                        option.value = staff.id;
+                        option.textContent = `${staff.full_name} (${staff.work_assignment || 'No assignment'})`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">No staff available</option>';
+                }
+            })
+            .catch(e => console.error('Error loading staff:', e));
+
+        // Handle notification form
+        document.getElementById('notifyForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const staffId = document.getElementById('staffSelect').value;
+            const message = document.getElementById('messageText').value;
+            const priority = document.getElementById('prioritySelect').value;
+            const attachmentUrl = document.getElementById('attachmentUrl').value;
+
+            if (!staffId) {
+                alert('Please select a staff member.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/staff-notifications', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        staff_id: staffId,
+                        message,
+                        priority,
+                        attachment_url: attachmentUrl || null
+                    })
+                });
+
+                const result = await response.json();
+                if (result.error) {
+                    alert(`Failed to send notification: ${result.error}`);
+                    return;
+                }
+
+                alert('Notification sent to staff!');
+            this.reset();
+            } catch (error) {
+                console.error('Error sending notification:', error);
+                alert('Unable to send notification. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html>
+

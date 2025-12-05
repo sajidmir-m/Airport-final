@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passenger Services - Baggage Tracking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+            <div class="container">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-suitcase me-2"></i>
+                    Real-Time Baggage Tracking
+                </a>
+                <div class="navbar-nav ms-auto">
+                    {% if current_user %}
+                    <span class="text-white me-3">
+                        <i class="fas fa-user me-1"></i>{{ current_user.full_name }}
+                    </span>
+                    <a class="btn btn-outline-light me-2" href="{{ url_for('logout') }}">
+                        <i class="fas fa-sign-out-alt me-1"></i>Logout
+                    </a>
+                    {% else %}
+                    <a class="btn btn-outline-light me-2" href="{{ url_for('login') }}">
+                        <i class="fas fa-sign-in-alt me-1"></i>Login
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Welcome Section -->
+            <div class="row mb-5">
+                <div class="col-12 text-center">
+                    <h1 class="display-4 mb-3">
+                        <i class="fas fa-search me-3 text-primary"></i>
+                        Track Your Baggage
+                    </h1>
+                    <p class="lead text-muted">
+                        Enter your bag ID or flight number to track your luggage in real-time
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tracking Form -->
+            <div class="row justify-content-center mb-5">
+                <div class="col-md-8">
+                    <div class="card shadow">
+                        <div class="card-body p-4">
+                            <form id="baggageTrackingForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="bagId" class="form-label">
+                                                <i class="fas fa-tag me-2"></i>Bag ID
+                                            </label>
+                                            <input type="text" class="form-control" id="bagId" 
+                                                   placeholder="Enter your bag ID (e.g., BAG12345)">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="flightNumber" class="form-label">
+                                                <i class="fas fa-plane me-2"></i>Flight Number
+                                            </label>
+                                            <input type="text" class="form-control" id="flightNumber" 
+                                                   placeholder="Enter flight number (e.g., AI101)">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-center">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-search me-2"></i>Track Baggage
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tracking Results -->
+            <div id="trackingResults" class="row" style="display: none;">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Tracking Results
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div id="bagageInfo">
+                                        <!-- Baggage information will be populated here -->
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div id="trackingTimeline">
+                                        <!-- Tracking timeline will be populated here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flight Information Section -->
+            <div class="row mt-5 mb-5" id="flight">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-plane me-2"></i>
+                                Flight Information
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="flightSearch" class="form-label">Search Flight</label>
+                                        <input type="text" class="form-control" id="flightSearch" 
+                                               placeholder="Enter flight number (e.g., AI101)">
+                                    </div>
+                                    <button class="btn btn-primary" onclick="searchFlight()">
+                                        <i class="fas fa-search me-2"></i>Search Flight
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <div id="flightInfo" class="d-none">
+                                        <!-- Flight information will be displayed here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Updates Section -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-clock me-2"></i>
+                                Real-time Updates
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <i class="fas fa-suitcase fa-3x text-primary mb-3"></i>
+                                        <h5>Baggage Status</h5>
+                                        <p class="text-muted">Track your luggage in real-time</p>
+                                        <div class="badge bg-success fs-6">Live Updates</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <i class="fas fa-plane fa-3x text-info mb-3"></i>
+                                        <h5>Flight Status</h5>
+                                        <p class="text-muted">Get latest flight information</p>
+                                        <div class="badge bg-info fs-6">Real-time</div>
+                                        </div>
+                                        </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <i class="fas fa-bell fa-3x text-warning mb-3"></i>
+                                        <h5>Notifications</h5>
+                                        <p class="text-muted">Stay informed about delays</p>
+                                        <div class="badge bg-warning fs-6">Instant</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Airport Facilities Section -->
+            <div class="row mb-5" id="facilities">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-info text-white">
+                            <h4><i class="fas fa-map-marker-alt me-2"></i>Airport Facilities & Services</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label for="facilityAirport" class="form-label">Select Airport</label>
+                                    <select class="form-select" id="facilityAirport">
+                                        <option value="">Choose an airport...</option>
+                                        {% for code, airport in airports.items() %}
+                                        <option value="{{ code }}">{{ airport.name }} ({{ code }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="facilitySearch" class="form-label">Search Facilities</label>
+                                    <input type="text" class="form-control" id="facilitySearch" placeholder="Search by name or location...">
+                                </div>
+                                <div class="col-md-4">
+                                    <button class="btn btn-info mt-4" id="loadFacilities">
+                                        <i class="fas fa-search me-1"></i>View Facilities
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="facilitiesInfo" class="mt-4 d-none">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h5><i class="fas fa-terminal me-2"></i>Terminals & Gates</h5>
+                                        <div id="terminalsGates"></div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h5><i class="fas fa-concierge-bell me-2"></i>Services & Amenities</h5>
+                                        <div id="services"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queue Information Section -->
+            <div class="row mb-5" id="queue">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-warning text-dark">
+                            <h4><i class="fas fa-clock me-2"></i>Real-Time Queue Information</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="queueAirport" class="form-label">Select Airport</label>
+                                    <select class="form-select" id="queueAirport">
+                                        <option value="">Choose an airport...</option>
+                                        {% for code, airport in airports.items() %}
+                                        <option value="{{ code }}">{{ airport.name }} ({{ code }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button class="btn btn-warning w-100" id="loadQueueStatus">
+                                        <i class="fas fa-sync-alt me-1"></i>Load Queue Status
+                                    </button>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="alert alert-info mb-0 w-100 text-center">
+                                        <small><i class="fas fa-info-circle me-1"></i>Updates every 30 seconds</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="queueInfo" class="d-none">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <h5><i class="fas fa-shield-alt text-danger me-2"></i>Security Queues</h5>
+                                        <div id="securityQueues"></div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <h5><i class="fas fa-check-in text-primary me-2"></i>Check-in Counters</h5>
+                                        <div id="checkinQueues"></div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <h5><i class="fas fa-passport text-success me-2"></i>Immigration & Customs</h5>
+                                        <div id="immigrationQueues"></div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <h5><i class="fas fa-headset text-info me-2"></i>Staff Help Locations</h5>
+                                        <div id="staffHelpLocations"></div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="card border-secondary">
+                                            <div class="card-header bg-secondary text-white">
+                                                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Queue Summary</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row text-center">
+                                                    <div class="col-md-3">
+                                                        <h4 class="text-primary" id="totalInQueues">-</h4>
+                                                        <p class="text-muted small">Total in Queues</p>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <h4 class="text-warning" id="avgWaitTime">-</h4>
+                                                        <p class="text-muted small">Avg Wait Time (min)</p>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <h4 class="text-success" id="fastestQueue">-</h4>
+                                                        <p class="text-muted small">Fastest Queue</p>
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <h4 class="text-danger" id="busiestQueue">-</h4>
+                                                        <p class="text-muted small">Busiest Queue</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passenger Services Section -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-success text-white">
+                            <h4><i class="fas fa-hands-helping me-2"></i>Passenger Services</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="service-card text-center p-3">
+                                        <i class="fas fa-wheelchair fa-2x text-primary mb-3"></i>
+                                        <h6>Wheelchair Assistance</h6>
+                                        <p class="small text-muted">Available at all terminals</p>
+                                        <button class="btn btn-sm btn-outline-primary">Request Service</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="service-card text-center p-3">
+                                        <i class="fas fa-baby fa-2x text-success mb-3"></i>
+                                        <h6>Baby Care Facilities</h6>
+                                        <p class="small text-muted">Nursing rooms & changing stations</p>
+                                        <button class="btn btn-sm btn-outline-success">View Locations</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="service-card text-center p-3">
+                                        <i class="fas fa-language fa-2x text-info mb-3"></i>
+                                        <h6>Language Support</h6>
+                                        <p class="small text-muted">Multi-language assistance</p>
+                                        <button class="btn btn-sm btn-outline-info">Get Help</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <div class="service-card text-center p-3">
+                                        <i class="fas fa-praying-hands fa-2x text-warning mb-3"></i>
+                                        <h6>Prayer Rooms</h6>
+                                        <p class="small text-muted">Multi-faith prayer facilities</p>
+                                        <button class="btn btn-sm btn-outline-warning">Find Rooms</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="service-card text-center p-3">
+                                        <i class="fas fa-wifi fa-2x text-secondary mb-3"></i>
+                                        <h6>Free WiFi</h6>
+                                        <p class="small text-muted">High-speed internet access</p>
+                                        <button class="btn btn-sm btn-outline-secondary">Connect</button>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="service-card text-center p-3">
+                                        <i class="fas fa-phone fa-2x text-danger mb-3"></i>
+                                        <h6>24/7 Support</h6>
+                                        <p class="small text-muted">Round-the-clock assistance</p>
+                                        <button class="btn btn-sm btn-outline-danger">Contact Us</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Passenger Information & Updates Section -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-primary text-white">
+                            <h4><i class="fas fa-info-circle me-2"></i>Passenger Information & Updates</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-newspaper me-2"></i>Latest Updates</h6>
+                                    <div class="alert alert-info">
+                                        <strong>Security Update:</strong> Enhanced security measures in place. Please arrive 2 hours before departure.
+                                    </div>
+                                    <div class="alert alert-warning">
+                                        <strong>Weather Alert:</strong> Light rain expected. Flights may experience minor delays.
+                                    </div>
+                                    <div class="alert alert-success">
+                                        <strong>Service Update:</strong> New restaurants opened in Terminal 2.
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-clock me-2"></i>Important Timings</h6>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Check-in Opens</span>
+                                            <span class="badge bg-primary">2 hours before</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Gate Closes</span>
+                                            <span class="badge bg-warning">30 min before</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Boarding Starts</span>
+                                            <span class="badge bg-info">45 min before</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Complaint System Section -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header bg-warning text-dark">
+                            <h4><i class="fas fa-exclamation-triangle me-2"></i>Report a Baggage Issue</h4>
+                        </div>
+                        <div class="card-body">
+                            <form id="complaintForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="passengerName" class="form-label">Your Name</label>
+                                            <input type="text" class="form-control" id="passengerName" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="complaintFlightNumber" class="form-label">Flight Number</label>
+                                            <input type="text" class="form-control" id="complaintFlightNumber" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="complaintBagId" class="form-label">Bag ID</label>
+                                            <input type="text" class="form-control" id="complaintBagId" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="complaintAirport" class="form-label">Airport</label>
+                                            <select class="form-select" id="complaintAirport" required>
+                                                <option value="">Select airport...</option>
+                                                {% for code, airport in airports.items() %}
+                                                <option value="{{ code }}">{{ airport.name }} ({{ code }})</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="issueType" class="form-label">Issue Type</label>
+                                            <select class="form-select" id="issueType" required>
+                                                <option value="">Select issue type...</option>
+                                                <option value="Lost Baggage">Lost Baggage</option>
+                                                <option value="Damaged Baggage">Damaged Baggage</option>
+                                                <option value="Delayed Baggage">Delayed Baggage</option>
+                                                <option value="Missing Items">Missing Items</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="description" class="form-label">Description</label>
+                                            <textarea class="form-control" id="description" rows="4" required placeholder="Please describe your issue in detail..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-paper-plane me-1"></i>Submit Complaint
+                                </button>
+                            </form>
+                            <div id="complaintResult" class="mt-3 d-none"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Standalone trackBaggage function for onclick events
+        async function trackBaggage() {
+            const bagId = document.getElementById('bagId').value;
+            const flightNumber = document.getElementById('flightNumber').value;
+            
+            if (!bagId) {
+                alert('Please enter a bag ID');
+                return;
+            }
+            
+            try {
+                const params = new URLSearchParams();
+                if (bagId) params.append('bag_id', bagId);
+                if (flightNumber) params.append('flight_number', flightNumber);
+                
+                const response = await fetch(`/api/baggage/track?${params}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                const resultsDiv = document.getElementById('trackingResults');
+                const infoDiv = document.getElementById('bagageInfo');
+                
+                if (data.message) {
+                    infoDiv.innerHTML = `<p class="text-muted">${data.message}</p>`;
+                } else {
+                    infoDiv.innerHTML = `
+                        <div class="alert alert-info">
+                            <h6><strong>Bag ID:</strong> ${data.bag_id}</h6>
+                            <p><strong>Flight:</strong> ${data.flight_number}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-primary">${data.current_status}</span></p>
+                            <p><strong>Location:</strong> ${data.location}</p>
+                            <p><strong>Weight:</strong> ${data.weight}</p>
+                            <p><strong>Destination:</strong> ${data.destination}</p>
+                            <p><strong>Last Updated:</strong> ${data.last_updated}</p>
+                        </div>
+                        <h6>Tracking History:</h6>
+                        <ul class="list-group">
+                            ${data.tracking_history.map(h => `
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>${h.status} - ${h.location}</span>
+                                    <small class="text-muted">${h.time}</small>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                }
+                
+                resultsDiv.classList.remove('d-none');
+            } catch (error) {
+                alert('Error tracking baggage: ' + error.message);
+            }
+        }
+
+        // Baggage Tracking
+        document.getElementById('baggageTrackingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const bagId = document.getElementById('bagId').value;
+            const flightNumber = document.getElementById('flightNumber').value;
+            
+            if (!bagId) {
+                alert('Please enter a bag ID');
+                return;
+            }
+            
+            try {
+                console.log('Tracking baggage:', bagId, flightNumber);
+                
+                const params = new URLSearchParams();
+                if (bagId) params.append('bag_id', bagId);
+                if (flightNumber) params.append('flight_number', flightNumber);
+                
+                const response = await fetch(`/api/baggage/track?${params}`);
+                console.log('API Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('API Response data:', data);
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                const resultsDiv = document.getElementById('trackingResults');
+                const infoDiv = document.getElementById('bagageInfo');
+                
+                if (!resultsDiv || !infoDiv) {
+                    console.error('Results divs not found');
+                    alert('Error: Could not find results container');
+                    return;
+                }
+                
+                if (data.message) {
+                    infoDiv.innerHTML = `<p class="text-muted">${data.message}</p>`;
+                } else {
+                    // Check if tracking_history exists and is an array
+                    const trackingHistory = data.tracking_history || [];
+                    const historyHtml = trackingHistory.length > 0 ? 
+                        trackingHistory.map(h => `
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>${h.status || 'Unknown'} - ${h.location || 'Unknown'}</span>
+                                <small class="text-muted">${h.time || 'Unknown'}</small>
+                            </li>
+                        `).join('') : '<li class="list-group-item">No tracking history available</li>';
+                    
+                    infoDiv.innerHTML = `
+                        <div class="alert alert-info">
+                            <h6><strong>Bag ID:</strong> ${data.bag_id || 'N/A'}</h6>
+                            <p><strong>Flight:</strong> ${data.flight_number || 'N/A'}</p>
+                            <p><strong>Status:</strong> <span class="badge bg-primary">${data.current_status || 'Unknown'}</span></p>
+                            <p><strong>Location:</strong> ${data.location || 'N/A'}</p>
+                            <p><strong>Weight:</strong> ${data.weight || 'N/A'}</p>
+                            <p><strong>Destination:</strong> ${data.destination || 'N/A'}</p>
+                            <p><strong>Last Updated:</strong> ${data.last_updated || 'N/A'}</p>
+                        </div>
+                        <h6>Tracking History:</h6>
+                        <ul class="list-group">
+                            ${historyHtml}
+                        </ul>
+                    `;
+                }
+                
+                resultsDiv.style.display = 'block';
+                resultsDiv.classList.remove('d-none');
+                console.log('Results displayed successfully');
+            } catch (error) {
+                console.error('Error tracking baggage:', error);
+                alert('Error tracking baggage: ' + error.message);
+            }
+        });
+        
+        // Store facilities data globally for search functionality
+        let currentFacilitiesData = null;
+        
+        // Facilities Loading
+        document.getElementById('loadFacilities').addEventListener('click', async function() {
+            console.log('Load facilities button clicked');
+            
+            const airportCode = document.getElementById('facilityAirport').value;
+            console.log('Selected airport code:', airportCode);
+            
+            if (!airportCode) {
+                alert('Please select an airport');
+                return;
+            }
+            
+            try {
+                console.log('Fetching facilities for airport:', airportCode);
+                const response = await fetch(`/api/airport/${airportCode}/facilities`);
+                console.log('Facilities API Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Facilities API Response data:', data);
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Store data for search functionality
+                currentFacilitiesData = data;
+                
+                displayFacilities(data);
+                console.log('Facilities displayed successfully');
+            } catch (error) {
+                console.error('Error loading facilities:', error);
+                alert('Error loading facilities: ' + error.message);
+            }
+        });
+        
+        // Search functionality
+        document.getElementById('facilitySearch').addEventListener('input', function() {
+            if (currentFacilitiesData) {
+                const searchTerm = this.value.toLowerCase();
+                const filteredData = filterFacilities(currentFacilitiesData, searchTerm);
+                displayFacilities(filteredData);
+            }
+        });
+        
+        // Function to filter facilities based on search term
+        function filterFacilities(data, searchTerm) {
+            if (!searchTerm) return data;
+            
+            const filteredData = JSON.parse(JSON.stringify(data)); // Deep copy
+            
+            // Filter washrooms
+            filteredData.facilities.washrooms = data.facilities.washrooms.filter(washroom => 
+                washroom.location.toLowerCase().includes(searchTerm) ||
+                washroom.type.toLowerCase().includes(searchTerm) ||
+                washroom.status.toLowerCase().includes(searchTerm)
+            );
+            
+            // Filter services
+            filteredData.facilities.services = data.facilities.services.filter(service => 
+                service.name.toLowerCase().includes(searchTerm) ||
+                service.location.toLowerCase().includes(searchTerm) ||
+                service.hours.toLowerCase().includes(searchTerm)
+            );
+            
+            // Filter terminals and airlines if search term matches
+            const terminalMatches = data.facilities.terminals.filter(terminal => 
+                terminal.toLowerCase().includes(searchTerm)
+            );
+            
+            if (terminalMatches.length > 0) {
+                filteredData.facilities.terminals = terminalMatches;
+                filteredData.facilities.gates = {};
+                filteredData.facilities.airlines = {};
+                
+                terminalMatches.forEach(terminal => {
+                    if (data.facilities.gates[terminal]) {
+                        filteredData.facilities.gates[terminal] = data.facilities.gates[terminal];
+                    }
+                    if (data.facilities.airlines[terminal]) {
+                        filteredData.facilities.airlines[terminal] = data.facilities.airlines[terminal];
+                    }
+                });
+            }
+            
+            // Update summary statistics
+            filteredData.total_terminals = filteredData.facilities.terminals.length;
+            filteredData.total_gates = Object.values(filteredData.facilities.gates).reduce((sum, gates) => sum + gates.length, 0);
+            filteredData.airlines_count = Object.values(filteredData.facilities.airlines).reduce((sum, airlines) => sum + airlines.length, 0);
+            
+            return filteredData;
+        }
+        
+        // Function to display facilities
+        function displayFacilities(data) {
+            console.log('Displaying facilities data:', data);
+            
+            const facilitiesDiv = document.getElementById('facilitiesInfo');
+            const terminalsDiv = document.getElementById('terminalsGates');
+            const servicesDiv = document.getElementById('services');
+            
+            if (!facilitiesDiv || !terminalsDiv || !servicesDiv) {
+                console.error('Required divs not found:', {
+                    facilitiesDiv: !!facilitiesDiv,
+                    terminalsDiv: !!terminalsDiv,
+                    servicesDiv: !!servicesDiv
+                });
+                return;
+            }
+            
+            // Display terminals and gates with better formatting
+            let terminalsHtml = '<div class="row">';
+            data.facilities.terminals.forEach(terminal => {
+                const gates = data.facilities.gates[terminal] || [];
+                const airlines = data.facilities.airlines[terminal] || [];
+                terminalsHtml += `
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-info">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="fas fa-terminal me-2"></i>${terminal}</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2"><strong><i class="fas fa-door-open me-1"></i>Gates:</strong></p>
+                                <p class="text-muted small">${gates.join(', ')}</p>
+                                <p class="mb-2"><strong><i class="fas fa-plane me-1"></i>Airlines:</strong></p>
+                                <p class="text-muted small">${airlines.join(', ')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            terminalsHtml += '</div>';
+            terminalsDiv.innerHTML = terminalsHtml;
+            
+            // Display services with better formatting
+            let servicesHtml = '<div class="row">';
+            
+            // Washrooms section
+            servicesHtml += `
+                <div class="col-md-6 mb-3">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="fas fa-restroom me-2"></i>Washrooms (${data.facilities.washrooms.length})</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+            `;
+            if (data.facilities.washrooms.length === 0) {
+                servicesHtml += '<li class="text-muted">No washrooms found matching your search.</li>';
+            } else {
+                data.facilities.washrooms.forEach(washroom => {
+                    const statusColor = washroom.status === 'Available' ? 'text-success' : 'text-warning';
+                    servicesHtml += `
+                        <li class="mb-2">
+                            <i class="fas fa-map-marker-alt text-primary me-2"></i>
+                            <strong>${washroom.location}</strong>
+                            <br><span class="text-muted small">Type: ${washroom.type}</span>
+                            <br><span class="${statusColor} small"><i class="fas fa-circle me-1"></i>${washroom.status}</span>
+                        </li>
+                    `;
+                });
+            }
+            servicesHtml += `
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Services section
+            servicesHtml += `
+                <div class="col-md-6 mb-3">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="fas fa-concierge-bell me-2"></i>Services & Amenities (${data.facilities.services.length})</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+            `;
+            if (data.facilities.services.length === 0) {
+                servicesHtml += '<li class="text-muted">No services found matching your search.</li>';
+            } else {
+                data.facilities.services.forEach(service => {
+                    servicesHtml += `
+                        <li class="mb-3">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-star text-warning me-2 mt-1"></i>
+                                <div>
+                                    <strong>${service.name}</strong>
+                                    <br><span class="text-muted small"><i class="fas fa-map-marker-alt me-1"></i>${service.location}</span>
+                                    <br><span class="text-info small"><i class="fas fa-clock me-1"></i>${service.hours}</span>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                });
+            }
+            servicesHtml += `
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            servicesHtml += '</div>';
+            
+            // Add summary statistics
+            servicesHtml += `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card border-secondary">
+                            <div class="card-header bg-secondary text-white">
+                                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Facility Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <h4 class="text-primary">${data.total_terminals}</h4>
+                                        <p class="text-muted small">Terminals</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-success">${data.total_gates}</h4>
+                                        <p class="text-muted small">Gates</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-info">${data.airlines_count}</h4>
+                                        <p class="text-muted small">Airlines</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <h4 class="text-warning">${data.facilities.washrooms.length + data.facilities.services.length}</h4>
+                                        <p class="text-muted small">Services</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            servicesDiv.innerHTML = servicesHtml;
+            facilitiesDiv.classList.remove('d-none');
+            facilitiesDiv.style.display = 'block';
+            console.log('Facilities display completed successfully');
+        }
+        
+        // Complaint Submission
+        document.getElementById('complaintForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                passenger_name: document.getElementById('passengerName').value,
+                flight_number: document.getElementById('complaintFlightNumber').value,
+                bag_id: document.getElementById('complaintBagId').value,
+                issue_type: document.getElementById('issueType').value,
+                description: document.getElementById('description').value,
+                airport_code: document.getElementById('complaintAirport').value
+            };
+            
+            try {
+                const response = await fetch('/api/complaints/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                const resultDiv = document.getElementById('complaintResult');
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <h6>Complaint Submitted Successfully!</h6>
+                            <p><strong>Complaint ID:</strong> ${data.complaint_id}</p>
+                            <p>${data.message}</p>
+                            <p><strong>Estimated Resolution:</strong> ${data.estimated_resolution}</p>
+                        </div>
+                    `;
+                    document.getElementById('complaintForm').reset();
+                }
+                
+                resultDiv.classList.remove('d-none');
+            } catch (error) {
+                const resultDiv = document.getElementById('complaintResult');
+                resultDiv.innerHTML = `<div class="alert alert-danger">Error submitting complaint: ${error.message}</div>`;
+                resultDiv.classList.remove('d-none');
+            }
+        });
+
+        // Flight Search Function
+        function searchFlight() {
+            const flightNumber = document.getElementById('flightSearch').value;
+            if (!flightNumber) {
+                alert('Please enter a flight number');
+                return;
+            }
+            
+            // Simulate flight search
+            const flightInfo = document.getElementById('flightInfo');
+            flightInfo.innerHTML = `
+                <div class="alert alert-info">
+                    <h6><strong>Flight:</strong> ${flightNumber}</h6>
+                    <p><strong>Status:</strong> <span class="badge bg-success">On Time</span></p>
+                    <p><strong>Departure:</strong> Terminal 1, Gate A5</p>
+                    <p><strong>Time:</strong> 14:30 (Local)</p>
+                    <p><strong>Destination:</strong> Mumbai (BOM)</p>
+                </div>
+            `;
+            flightInfo.classList.remove('d-none');
+        }
+
+        // Queue Status Loading
+        let queueUpdateInterval = null;
+        document.getElementById('loadQueueStatus').addEventListener('click', async function() {
+            const airportCode = document.getElementById('queueAirport').value;
+            
+            if (!airportCode) {
+                alert('Please select an airport');
+                return;
+            }
+            
+            await loadQueueStatus(airportCode);
+            
+            // Set up auto-refresh every 30 seconds
+            if (queueUpdateInterval) {
+                clearInterval(queueUpdateInterval);
+            }
+            queueUpdateInterval = setInterval(() => {
+                loadQueueStatus(airportCode);
+            }, 30000);
+        });
+        
+        async function loadQueueStatus(airportCode) {
+            try {
+                console.log('Loading queue status for airport:', airportCode);
+                const response = await fetch(`/api/airport/${airportCode}/queue-status`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                displayQueueStatus(data);
+                console.log('Queue status displayed successfully');
+            } catch (error) {
+                console.error('Error loading queue status:', error);
+                alert('Error loading queue status: ' + error.message);
+            }
+        }
+        
+        function displayQueueStatus(data) {
+            const queueInfoDiv = document.getElementById('queueInfo');
+            if (!queueInfoDiv) return;
+            
+            // Extract checkpoints from chart data
+            const checkpoints = data.checkpoints || [];
+            
+            // Separate checkpoints by type
+            const securityQueues = checkpoints.filter(cp => cp.name.toLowerCase().includes('security'));
+            const checkinQueues = checkpoints.filter(cp => cp.name.toLowerCase().includes('check-in'));
+            const immigrationQueues = checkpoints.filter(cp => 
+                cp.name.toLowerCase().includes('immigration') || 
+                cp.name.toLowerCase().includes('customs')
+            );
+            
+            // Display Security Queues
+            let securityHtml = '';
+            if (securityQueues.length === 0) {
+                securityHtml = '<p class="text-muted">No security queues available</p>';
+            } else {
+                securityQueues.forEach(queue => {
+                    const waitTimeColor = queue.avg_wait_time > 10 ? 'text-danger' : 
+                                         queue.avg_wait_time > 5 ? 'text-warning' : 'text-success';
+                    const queueColor = queue.current_queue > 20 ? 'bg-danger' : 
+                                      queue.current_queue > 10 ? 'bg-warning' : 'bg-success';
+                    securityHtml += `
+                        <div class="card mb-2 border-danger">
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${queue.name}</strong>
+                                        <br><small class="text-muted">${queue.current_queue} people in queue</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge ${queueColor}">${queue.current_queue}</span>
+                                        <br><small class="${waitTimeColor}">${queue.avg_wait_time} min wait</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('securityQueues').innerHTML = securityHtml;
+            
+            // Display Check-in Queues
+            let checkinHtml = '';
+            if (checkinQueues.length === 0) {
+                checkinHtml = '<p class="text-muted">No check-in queues available</p>';
+            } else {
+                checkinQueues.forEach(queue => {
+                    const waitTimeColor = queue.avg_wait_time > 10 ? 'text-danger' : 
+                                         queue.avg_wait_time > 5 ? 'text-warning' : 'text-success';
+                    const queueColor = queue.current_queue > 30 ? 'bg-danger' : 
+                                      queue.current_queue > 15 ? 'bg-warning' : 'bg-success';
+                    checkinHtml += `
+                        <div class="card mb-2 border-primary">
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${queue.name}</strong>
+                                        <br><small class="text-muted">${queue.current_queue} people in queue</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge ${queueColor}">${queue.current_queue}</span>
+                                        <br><small class="${waitTimeColor}">${queue.avg_wait_time} min wait</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('checkinQueues').innerHTML = checkinHtml;
+            
+            // Display Immigration & Customs Queues
+            let immigrationHtml = '';
+            if (immigrationQueues.length === 0) {
+                immigrationHtml = '<p class="text-muted">No immigration/customs queues available</p>';
+            } else {
+                immigrationQueues.forEach(queue => {
+                    const waitTimeColor = queue.avg_wait_time > 5 ? 'text-danger' : 
+                                         queue.avg_wait_time > 3 ? 'text-warning' : 'text-success';
+                    const queueColor = queue.current_queue > 15 ? 'bg-danger' : 
+                                      queue.current_queue > 8 ? 'bg-warning' : 'bg-success';
+                    immigrationHtml += `
+                        <div class="card mb-2 border-success">
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${queue.name}</strong>
+                                        <br><small class="text-muted">${queue.current_queue} people in queue</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge ${queueColor}">${queue.current_queue}</span>
+                                        <br><small class="${waitTimeColor}">${queue.avg_wait_time} min wait</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('immigrationQueues').innerHTML = immigrationHtml;
+            
+            // Display Staff Help Locations
+            const staffHelpHtml = `
+                <div class="card mb-2 border-info">
+                    <div class="card-body p-2">
+                        <strong><i class="fas fa-info-desk me-2"></i>Information Desk</strong>
+                        <br><small class="text-muted">Terminal 1, Gate A1 - Available 24/7</small>
+                    </div>
+                </div>
+                <div class="card mb-2 border-info">
+                    <div class="card-body p-2">
+                        <strong><i class="fas fa-headset me-2"></i>Customer Service</strong>
+                        <br><small class="text-muted">Terminal 2, Gate B5 - Available 24/7</small>
+                    </div>
+                </div>
+                <div class="card mb-2 border-info">
+                    <div class="card-body p-2">
+                        <strong><i class="fas fa-question-circle me-2"></i>Help Center</strong>
+                        <br><small class="text-muted">Terminal 3, Gate C10 - Available 24/7</small>
+                    </div>
+                </div>
+            `;
+            document.getElementById('staffHelpLocations').innerHTML = staffHelpHtml;
+            
+            // Update Summary Statistics
+            if (data.total_in_queues !== undefined) {
+                document.getElementById('totalInQueues').textContent = data.total_in_queues;
+            }
+            if (data.avg_wait_time_overall !== undefined) {
+                document.getElementById('avgWaitTime').textContent = Math.round(data.avg_wait_time_overall);
+            }
+            
+            // Find fastest and busiest queues
+            if (checkpoints.length > 0) {
+                const fastest = checkpoints.reduce((min, cp) => 
+                    cp.avg_wait_time < min.avg_wait_time ? cp : min
+                );
+                const busiest = checkpoints.reduce((max, cp) => 
+                    cp.current_queue > max.current_queue ? cp : max
+                );
+                document.getElementById('fastestQueue').textContent = fastest.name;
+                document.getElementById('busiestQueue').textContent = busiest.name;
+            }
+            
+            queueInfoDiv.classList.remove('d-none');
+            queueInfoDiv.style.display = 'block';
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up real-time updates for passenger services
+            updatePassengerServices();
+            
+            // Refresh passenger services every 90 seconds (1.5 minutes)
+            setInterval(updatePassengerServices, 90000);
+        });
+
+        function updatePassengerServices() {
+            // Update real-time status indicators
+            const now = new Date();
+            document.querySelectorAll('.badge').forEach(badge => {
+                if (badge.textContent.includes('Live Updates') || 
+                    badge.textContent.includes('Real-time') || 
+                    badge.textContent.includes('Instant')) {
+                    badge.style.animation = 'pulse 2s infinite';
+                }
+            });
+        }
+    </script>
+
+    <style>
+        .service-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+            transition: all 0.3s ease;
+        }
+
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+            padding-left: 25px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            background: #007bff;
+            border-radius: 50%;
+        }
+
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            left: -1px;
+            top: 15px;
+            width: 2px;
+            height: calc(100% + 5px);
+            background: #dee2e6;
+        }
+
+        .timeline-item:last-child::after {
+            display: none;
+        }
+
+        .timeline-time {
+            font-weight: bold;
+            color: #007bff;
+            font-size: 0.9em;
+        }
+
+        .timeline-content {
+            margin-top: 5px;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .card.shadow {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card.shadow:hover {
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+        }
+    </style>\n</body>\n</html>
