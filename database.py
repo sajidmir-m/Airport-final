@@ -94,39 +94,45 @@ def fix_database_url(url: str) -> str:
 # Get database URL from environment variable
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-if not DATABASE_URL:
-    raise ValueError(
-        "DATABASE_URL environment variable is required. "
-        "Please set it in your .env file or environment."
-    )
+# Initialize engine as None - will be created lazily if DATABASE_URL is available
+engine = None
 
-# Fix any malformed connection strings
-DATABASE_URL = fix_database_url(DATABASE_URL)
-
-# Create SQLAlchemy engine with sensible defaults for cloud databases
-# Optimize pool settings for serverless (Vercel) vs traditional server
-is_serverless = os.environ.get('VERCEL_ENV') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME')
-
-if is_serverless:
-    # Serverless: smaller pool, connections are short-lived
-    engine = create_engine(
-        DATABASE_URL,
-        echo=False,
-        pool_pre_ping=True,
-        pool_size=1,
-        max_overflow=2,
-        pool_recycle=300,  # Recycle connections after 5 minutes
-        future=True,
-    )
+if DATABASE_URL:
+    try:
+        # Fix any malformed connection strings
+        DATABASE_URL = fix_database_url(DATABASE_URL)
+        
+        # Create SQLAlchemy engine with sensible defaults for cloud databases
+        # Optimize pool settings for serverless (Vercel) vs traditional server
+        is_serverless = os.environ.get('VERCEL_ENV') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME')
+        
+        if is_serverless:
+            # Serverless: smaller pool, connections are short-lived
+            engine = create_engine(
+                DATABASE_URL,
+                echo=False,
+                pool_pre_ping=True,
+                pool_size=1,
+                max_overflow=2,
+                pool_recycle=300,  # Recycle connections after 5 minutes
+            )
+        else:
+            # Traditional server: larger pool for persistent connections
+            engine = create_engine(
+                DATABASE_URL,
+                echo=False,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+            )
+        logger.info("Database engine created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create database engine: {e}", exc_info=True)
+        engine = None
 else:
-    # Traditional server: larger pool for persistent connections
-    engine = create_engine(
-        DATABASE_URL,
-        echo=False,
-        pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
-        future=True,
+    logger.warning(
+        "DATABASE_URL environment variable not set. "
+        "Database functionality will be unavailable."
     )
 
 
@@ -134,18 +140,26 @@ class Base(DeclarativeBase):
     """Base declarative class for ORM models."""
 
 
-SessionLocal = scoped_session(
-    sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=engine,
+# Create SessionLocal only if engine exists
+if engine:
+    SessionLocal = scoped_session(
+        sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=engine,
+        )
     )
-)
+else:
+    SessionLocal = None
 
 
 @contextmanager
 def db_session() -> Generator:
     """Provide a transactional scope around a series of operations."""
+    if SessionLocal is None:
+        raise RuntimeError(
+            "Database not configured. Please set DATABASE_URL environment variable."
+        )
     session = SessionLocal()
     try:
         yield session
@@ -159,41 +173,49 @@ def db_session() -> Generator:
 
 def init_db():
     """Initialize database tables and add missing columns if needed."""
+    if engine is None:
+        logger.warning("Cannot initialize database: engine not available")
+        return
+    
     from models import User, StaffNotification  # noqa: F401
 
     try:
-        print("🔄 Initializing database...")
+        logger.info("🔄 Initializing database...")
         Base.metadata.create_all(bind=engine)
-        print("✅ Database tables created/verified")
+        logger.info("✅ Database tables created/verified")
         
         # Check and add missing columns if they don't exist
-        with db_session() as db:
-            inspector = inspect(engine)
-            columns = [col['name'] for col in inspector.get_columns('users')]
-            
-            # Add airport_code column if it doesn't exist
-            if 'airport_code' not in columns:
-                print("📝 Adding airport_code column to users table...")
-                db.execute(text("ALTER TABLE users ADD COLUMN airport_code VARCHAR(10)"))
-                db.commit()
-                print("✅ Added airport_code column")
-            
-            # Add created_by column if it doesn't exist
-            if 'created_by' not in columns:
-                print("📝 Adding created_by column to users table...")
-                db.execute(text("ALTER TABLE users ADD COLUMN created_by VARCHAR(36)"))
-                db.commit()
-                print("✅ Added created_by column")
-            
-            # Add work_assignment column if it doesn't exist
-            if 'work_assignment' not in columns:
-                print("📝 Adding work_assignment column to users table...")
-                db.execute(text("ALTER TABLE users ADD COLUMN work_assignment VARCHAR(50)"))
-                db.commit()
-                print("✅ Added work_assignment column")
+        try:
+            with db_session() as db:
+                inspector = inspect(engine)
+                # Check if users table exists
+                if inspector.has_table('users'):
+                    columns = [col['name'] for col in inspector.get_columns('users')]
+                    
+                    # Add airport_code column if it doesn't exist
+                    if 'airport_code' not in columns:
+                        logger.info("📝 Adding airport_code column to users table...")
+                        db.execute(text("ALTER TABLE users ADD COLUMN airport_code VARCHAR(10)"))
+                        db.commit()
+                        logger.info("✅ Added airport_code column")
+                    
+                    # Add created_by column if it doesn't exist
+                    if 'created_by' not in columns:
+                        logger.info("📝 Adding created_by column to users table...")
+                        db.execute(text("ALTER TABLE users ADD COLUMN created_by VARCHAR(36)"))
+                        db.commit()
+                        logger.info("✅ Added created_by column")
+                    
+                    # Add work_assignment column if it doesn't exist
+                    if 'work_assignment' not in columns:
+                        logger.info("📝 Adding work_assignment column to users table...")
+                        db.execute(text("ALTER TABLE users ADD COLUMN work_assignment VARCHAR(50)"))
+                        db.commit()
+                        logger.info("✅ Added work_assignment column")
+        except Exception as column_error:
+            logger.warning(f"Could not check/add columns (this is OK if tables are already set up): {column_error}")
                 
     except Exception as e:
-        print(f"❌ Error initializing database: {e}")
         logger.error(f"Error initializing database: {e}", exc_info=True)
-        # Try to continue anyway
+        # Don't raise - allow app to continue even if DB init fails
 

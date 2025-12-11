@@ -31,9 +31,13 @@ def create_app():
     def public_files(filename):
         return send_from_directory(os.path.join(app.root_path, 'public'), filename)
     
-    init_db()
+    # Initialize database (non-blocking - app will work even if this fails)
+    try:
+        init_db()
+    except Exception as e:
+        logger.warning(f"Database initialization skipped: {e}")
     
-    # Initialize managers
+    # Initialize managers (these don't require database connection on init)
     dashboard_manager = DashboardManager()
     data_source_manager = DataSourceManager()
     
