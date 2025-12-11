@@ -104,14 +104,30 @@ if not DATABASE_URL:
 DATABASE_URL = fix_database_url(DATABASE_URL)
 
 # Create SQLAlchemy engine with sensible defaults for cloud databases
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-    future=True,
-)
+# Optimize pool settings for serverless (Vercel) vs traditional server
+is_serverless = os.environ.get('VERCEL_ENV') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME')
+
+if is_serverless:
+    # Serverless: smaller pool, connections are short-lived
+    engine = create_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=1,
+        max_overflow=2,
+        pool_recycle=300,  # Recycle connections after 5 minutes
+        future=True,
+    )
+else:
+    # Traditional server: larger pool for persistent connections
+    engine = create_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        future=True,
+    )
 
 
 class Base(DeclarativeBase):
