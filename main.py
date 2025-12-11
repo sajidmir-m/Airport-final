@@ -3,11 +3,12 @@ Vercel serverless function entry point for Flask application.
 This file exports the Flask app for Vercel's serverless environment.
 """
 import os
+import sys
 import logging
+import traceback
 from flask import Flask, jsonify
 from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
-from web_server import create_app
 
 # Load environment variables
 load_dotenv()
@@ -16,25 +17,90 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create the Flask app with error handling
+# Create the Flask app with comprehensive error handling
 app_created = False
+init_error = None
+
 try:
+    # Try to import and create the app
+    from web_server import create_app
     app = create_app()
     app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
     app_created = True
+    logger.info("Flask app created successfully")
+except ImportError as e:
+    init_error = f"Import error: {str(e)}\n{traceback.format_exc()}"
+    logger.error(init_error)
 except Exception as e:
-    logger.error(f"Failed to create Flask app: {e}", exc_info=True)
-    # Create a minimal app that shows error
+    init_error = f"Failed to create Flask app: {str(e)}\n{traceback.format_exc()}"
+    logger.error(init_error, exc_info=True)
+
+# If app creation failed, create a minimal error app
+if not app_created:
     app = Flask(__name__)
     app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
     
     @app.route('/')
+    def error_handler_root():
+        error_msg = init_error or "Unknown error during initialization"
+        # Return HTML for browser requests
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Application Error</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }}
+                h1 {{ color: #d32f2f; }}
+                pre {{ background: #f5f5f5; padding: 20px; border-radius: 5px; overflow-x: auto; }}
+            </style>
+        </head>
+        <body>
+            <h1>Application Initialization Failed</h1>
+            <p><strong>Error:</strong> {str(error_msg).split(chr(10))[0]}</p>
+            <p>Check Vercel logs for details. Ensure DATABASE_URL is set correctly.</p>
+            <details>
+                <summary>Full Error Details</summary>
+                <pre>{error_msg}</pre>
+            </details>
+            <p><small>Python: {sys.version.split()[0]} | Vercel Env: {os.environ.get('VERCEL_ENV', 'not set')}</small></p>
+        </body>
+        </html>
+        """, 500
+    
     @app.route('/<path:path>')
     def error_handler(path=''):
+        error_msg = init_error or "Unknown error during initialization"
+        # Check if it's an API request
+        if path.startswith('api/'):
+            return jsonify({
+                'error': 'Application initialization failed',
+                'message': str(error_msg).split('\n')[0],
+                'full_error': error_msg,
+                'hint': 'Check Vercel logs for details. Ensure DATABASE_URL is set correctly.',
+                'python_version': sys.version,
+                'vercel_env': os.environ.get('VERCEL_ENV', 'not set')
+            }), 500
+        else:
+            # Return HTML for other routes
+            return f"""
+            <!DOCTYPE html>
+            <html>
+            <head><title>Application Error</title></head>
+            <body>
+                <h1>Application Initialization Failed</h1>
+                <p>{str(error_msg).split(chr(10))[0]}</p>
+            </body>
+            </html>
+            """, 500
+    
+    # Add a test route even in error mode
+    @app.route('/api/test')
+    def test_error_mode():
         return jsonify({
-            'error': 'Application initialization failed',
-            'message': str(e),
-            'hint': 'Check Vercel logs for details. Ensure DATABASE_URL is set correctly.'
+            'status': 'error',
+            'message': 'App initialization failed',
+            'error': str(init_error).split('\n')[0] if init_error else 'Unknown error'
         }), 500
 
 # Configure for Vercel deployment (only if app was created successfully)
@@ -118,7 +184,21 @@ if app_created:
         })
 
 # Export the WSGI application for Vercel
-# Vercel expects the app to be named 'app'
+# Vercel expects the app to be named 'app' or 'application'
+# Ensure it's always defined, even if initialization failed
+if 'app' not in locals():
+    # Fallback: create absolute minimal app
+    app = Flask(__name__)
+    app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+    
+    @app.route('/')
+    @app.route('/<path:path>')
+    def fallback_error(path=''):
+        return jsonify({
+            'error': 'Critical initialization failure',
+            'message': 'Unable to create Flask application'
+        }), 500
+
 application = app
 
 # For local development
